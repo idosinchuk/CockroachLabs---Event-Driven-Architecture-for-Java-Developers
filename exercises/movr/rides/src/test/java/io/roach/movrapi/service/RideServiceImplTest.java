@@ -2,6 +2,7 @@ package io.roach.movrapi.service;
 
 import io.roach.movrapi.dao.RideRepository;
 import io.roach.movrapi.entity.Ride;
+import io.roach.movrapi.events.EventPublisher;
 import io.roach.movrapi.exception.InvalidVehicleStateException;
 import io.roach.movrapi.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,12 +30,15 @@ public class RideServiceImplTest {
     @Mock
     private RideRepository rideRepository;
 
+    @Mock
+    private EventPublisher eventPublisher;
+
     private RideService rideService;
 
     @BeforeEach
     public void init() {
         MockitoAnnotations.openMocks(this);
-        rideService = new RideServiceImpl(rideRepository);
+        rideService = new RideServiceImpl(rideRepository, eventPublisher);
     }
 
     @Test

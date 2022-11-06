@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import io.roach.movrapi.events.EventPublisher;
+import io.roach.movrapi.events.RideStarted;
 import io.roach.movrapi.exception.InvalidVehicleStateException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,10 +27,12 @@ import static io.roach.movrapi.util.Constants.ERR_VEHICLE_IN_USE;
 public class RideServiceImpl implements RideService {
 
     private RideRepository rideRepository;
+    private EventPublisher eventPublisher;
 
     @Autowired
-    public RideServiceImpl(RideRepository rideRepository) {
+    public RideServiceImpl(RideRepository rideRepository, EventPublisher eventPublisher) {
         this.rideRepository = rideRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -54,6 +58,14 @@ public class RideServiceImpl implements RideService {
         ride.setVehicleId(vehicleId);
         ride.setStartTime(startTime);
         rideRepository.save(ride);
+
+        RideStarted rideStarted = new RideStarted();
+        rideStarted.setRideId(ride.getId());
+        rideStarted.setUserEmail(userEmail);
+        rideStarted.setVehicleId(vehicleId);
+        ride.setStartTime(startTime);
+
+        eventPublisher.publish(RideStarted.EVENT_NAME, rideStarted);
 
         return ride;
     }
