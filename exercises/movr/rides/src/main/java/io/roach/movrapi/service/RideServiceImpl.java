@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import io.roach.movrapi.events.EventPublisher;
+import io.roach.movrapi.events.RideEnded;
 import io.roach.movrapi.events.RideStarted;
 import io.roach.movrapi.exception.InvalidVehicleStateException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import io.roach.movrapi.dao.RideRepository;
 import io.roach.movrapi.entity.Ride;
 import io.roach.movrapi.exception.InvalidValueException;
 import io.roach.movrapi.exception.NotFoundException;
+
 import static io.roach.movrapi.util.Constants.ERR_NO_ACTIVE_RIDE;
 import static io.roach.movrapi.util.Constants.ERR_VEHICLE_IN_USE;
 
@@ -38,18 +40,18 @@ public class RideServiceImpl implements RideService {
     /**
      * Starts a ride for this vehicle/user combination.
      *
-     * @param vehicleId                         the vehicle that the user will be riding
-     * @param userEmail                         the email address that identifies the user
-     * @param startTime                         the date/time that the user is starting their ride
-     * @return                                  the Ride object representing the user's ride
-     * @throws NotFoundException                if the vehicle or user is not found
+     * @param vehicleId the vehicle that the user will be riding
+     * @param userEmail the email address that identifies the user
+     * @param startTime the date/time that the user is starting their ride
+     * @return the Ride object representing the user's ride
+     * @throws NotFoundException if the vehicle or user is not found
      */
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public Ride startRide(UUID vehicleId, String userEmail, LocalDateTime startTime) throws InvalidVehicleStateException {
         List<Ride> activeRidesForVehicle = rideRepository.getActiveRidesForVehicle(vehicleId);
 
-        if(!activeRidesForVehicle.isEmpty()) {
+        if (!activeRidesForVehicle.isEmpty()) {
             throw new InvalidVehicleStateException(String.format(ERR_VEHICLE_IN_USE, vehicleId.toString()));
         }
 
@@ -73,12 +75,12 @@ public class RideServiceImpl implements RideService {
     /**
      * Ends the active ride for this vehicle/email combination.
      *
-     * @param vehicleId                     the vehicle that the user will be riding
-     * @param userEmail                     the email address that identifies the user
-     * @param endTime                       the date/time the ride ended
-     * @return                              A status message describing the distance travelled, speed, and duration
-     * @throws NotFoundException            if the vehicle or user is not found
-     * @throws InvalidValueException        if an error occurs during the math calculations
+     * @param vehicleId the vehicle that the user will be riding
+     * @param userEmail the email address that identifies the user
+     * @param endTime   the date/time the ride ended
+     * @return A status message describing the distance travelled, speed, and duration
+     * @throws NotFoundException     if the vehicle or user is not found
+     * @throws InvalidValueException if an error occurs during the math calculations
      */
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE)
@@ -89,7 +91,7 @@ public class RideServiceImpl implements RideService {
             double latitude,
             double longitude,
             LocalDateTime endTime)
-        throws NotFoundException {
+            throws NotFoundException {
 
         // get the active ride for this user/vehicle
         Ride ride = getActiveRide(vehicleId, userEmail);
@@ -98,15 +100,26 @@ public class RideServiceImpl implements RideService {
         ride.setEndTime(endTime);
         rideRepository.save(ride);
 
+        RideEnded rideEnded = new RideEnded();
+        rideEnded.setRideId(ride.getId());
+        rideEnded.setUserEmail(userEmail);
+        rideEnded.setVehicleId(vehicleId);
+        rideEnded.setEndTime(endTime);
+        rideEnded.setBattery(battery);
+        rideEnded.setLatitude(latitude);
+        rideEnded.setLongitude(longitude);
+
+        eventPublisher.publish(RideEnded.EVENT_NAME, rideEnded);
+
         return ride;
     }
 
     /**
      * Gets all rides for the specified user.
      *
-     * @param userEmail           the email address that identifies the user
-     * @return                    List of ride objects for this user
-     * @throws NotFoundException  if the user is not found
+     * @param userEmail the email address that identifies the user
+     * @return List of ride objects for this user
+     * @throws NotFoundException if the user is not found
      */
     @Override
     @Transactional(isolation = Isolation.SERIALIZABLE, readOnly = true)
@@ -118,10 +131,10 @@ public class RideServiceImpl implements RideService {
     /**
      * Gets a specific active ride (user/vehicle combination).
      *
-     * @param vehicleId           the vehicle that the user is riding
-     * @param userEmail           the email address that identifies the user
-     * @return                    the Ride object representing the requested ride
-     * @throws NotFoundException  if the vehicle or user is not found
+     * @param vehicleId the vehicle that the user is riding
+     * @param userEmail the email address that identifies the user
+     * @return the Ride object representing the requested ride
+     * @throws NotFoundException if the vehicle or user is not found
      */
     @Override
     public Ride getActiveRide(UUID vehicleId, String userEmail) throws NotFoundException {
